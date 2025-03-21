@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高機能着せ替えゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .character-area {
+            position: relative;
+            width: 300px;
+            height: 400px;
+            margin: 0 auto;
+            background-color: rgba(240, 240, 240, 0.5);
+        }
+        .character-layer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-position: center;
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+        .draggable-part {
+            position: absolute;
+            cursor: move;
+            touch-action: none;
+            z-index: 10;
+        }
+        .part-item {
+            width: 60px;
+            height: 60px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .part-item:hover, .part-item.selected {
+            border-color: #5D5CDE;
+            transform: scale(1.05);
+        }
+        .part-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .dark .character-area {
+            background-color: rgba(60, 60, 60, 0.5);
+        }
+        .control-handle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #5D5CDE;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 20;
+        }
+        .resize-handle {
+            right: -10px;
+            bottom: -10px;
+            cursor: nwse-resize;
+        }
+        .rotate-handle {
+            right: -10px;
+            top: -10px;
+            cursor: url("data:image/svg+xml;utf8,<svg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path d='M 8,0 V 16 M 0,8 H 16' stroke='black' stroke-width='2'/></svg>"), auto;
+        }
+        .remove-handle {
+            left: -10px;
+            top: -10px;
+            background-color: #ff4d4d;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-white dark:bg-gray-900 dark:text-white transition-colors duration-300">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-6 text-primary">高機能着せ替えゲーム</h1>
+        
+        <div class="flex flex-col md:flex-row gap-6">
+            <!-- キャラクター表示エリア -->
+            <div class="w-full md:w-1/2 flex flex-col items-center">
+                <div class="character-area rounded-lg overflow-hidden border-2 border-primary mb-4" id="character-canvas">
+                    <div id="baseLayer" class="character-layer"></div>
+                    <!-- 追加されたパーツがここに入ります -->
+                </div>
+                <div class="mt-2 flex gap-2 justify-center flex-wrap">
+                    <button id="downloadBtn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                        スクリーンショット
+                    </button>
+                    <button id="resetBtn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                        リセット
+                    </button>
+                </div>
+            </div>
+            
+            <!-- パーツ選択エリア -->
+            <div class="w-full md:w-1/2">
+                <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+                    <!-- タブメニュー -->
+                    <div class="flex mb-4 overflow-x-auto pb-2">
+                        <button class="part-tab px-3 py-1 mr-2 rounded-lg bg-primary text-white" data-tab="base">ベース</button>
+                        <button class="part-tab px-3 py-1 mr-2 rounded-lg bg-gray-300 dark:bg-gray-700" data-tab="parts">パーツ</button>
+                        <button class="part-tab px-3 py-1 mr-2 rounded-lg bg-gray-300 dark:bg-gray-700" data-tab="image-search">画像検索</button>
+                        <button class="part-tab px-3 py-1 mr-2 rounded-lg bg-gray-300 dark:bg-gray-700" data-tab="upload">アップロード</button>
+                    </div>
+
+                    <!-- ベースタブ -->
+                    <div class="part-content" id="base-content">
+                        <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            <div class="part-item selected" data-type="base" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZWxsaXBzZSBjeD0iMTUwIiBjeT0iMTUwIiByeD0iODAiIHJ5PSI5MCIgZmlsbD0iI2ZmZDhiNSIvPjxwYXRoIGQ9Ik05MCwyMDAgQzEwMCwxODAgMTUwLDE3MCAxNTAsMTcwIEMxNTAsMTcwIDIwMCwxODAgMjEwLDIwMCBMMjEwLDM1MCBDOTAsMzUwIDkwLDIwMCA5MCwyMDAgWiIgZmlsbD0iI2VlZWVlZSIvPjwvc3ZnPg==">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZWxsaXBzZSBjeD0iMTUwIiBjeT0iMTUwIiByeD0iODAiIHJ5PSI5MCIgZmlsbD0iI2ZmZDhiNSIvPjxwYXRoIGQ9Ik05MCwyMDAgQzEwMCwxODAgMTUwLDE3MCAxNTAsMTcwIEMxNTAsMTcwIDIwMCwxODAgMjEwLDIwMCBMMjEwLDM1MCBDOTAsMzUwIDkwLDIwMCA5MCwyMDAgWiIgZmlsbD0iI2VlZWVlZSIvPjwvc3ZnPg==" alt="Base 1">
+                            </div>
+                            <div class="part-item" data-type="base" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZWxsaXBzZSBjeD0iMTUwIiBjeT0iMTUwIiByeD0iODAiIHJ5PSI5MCIgZmlsbD0iI2YwYzA4MCIvPjxwYXRoIGQ9Ik05MCwyMDAgQzEwMCwxODAgMTUwLDE3MCAxNTAsMTcwIEMxNTAsMTcwIDIwMCwxODAgMjEwLDIwMCBMMjEwLDM1MCBDOTAsMzUwIDkwLDIwMCA5MCwyMDAgWiIgZmlsbD0iI2RkZGRkZCIvPjwvc3ZnPg==">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZWxsaXBzZSBjeD0iMTUwIiBjeT0iMTUwIiByeD0iODAiIHJ5PSI5MCIgZmlsbD0iI2YwYzA4MCIvPjxwYXRoIGQ9Ik05MCwyMDAgQzEwMCwxODAgMTUwLDE3MCAxNTAsMTcwIEMxNTAsMTcwIDIwMCwxODAgMjEwLDIwMCBMMjEwLDM1MCBDOTAsMzUwIDkwLDIwMCA5MCwyMDAgWiIgZmlsbD0iI2RkZGRkZCIvPjwvc3ZnPg==" alt="Base 2">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- パーツタブ -->
+                    <div class="part-content hidden" id="parts-content">
+                        <div class="mb-4">
+                            <label class="block mb-2 font-medium">パーツ種類</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button class="parts-category-btn px-3 py-1 bg-primary text-white rounded-lg" data-category="eyes">目</button>
+                                <button class="parts-category-btn px-3 py-1 bg-gray-300 dark:bg-gray-700 rounded-lg" data-category="hair">髪型</button>
+                                <button class="parts-category-btn px-3 py-1 bg-gray-300 dark:bg-gray-700 rounded-lg" data-category="mouth">口</button>
+                                <button class="parts-category-btn px-3 py-1 bg-gray-300 dark:bg-gray-700 rounded-lg" data-category="accessory">アクセサリー</button>
+                            </div>
+                        </div>
+                        
+                        <div id="parts-grid" class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            <!-- 目パーツ (デフォルト表示) -->
+                            <div class="part-item draggable" data-type="part" data-category="eyes" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjQwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjEwIiBmaWxsPSIjMDAwIi8+PGNpcmNsZSBjeD0iODAiIGN5PSIyMCIgcj0iMTAiIGZpbGw9IiMwMDAiLz48L3N2Zz4=">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjQwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjEwIiBmaWxsPSIjMDAwIi8+PGNpcmNsZSBjeD0iODAiIGN5PSIyMCIgcj0iMTAiIGZpbGw9IiMwMDAiLz48L3N2Zz4=" alt="Eyes 1">
+                            </div>
+                            <div class="part-item draggable" data-type="part" data-category="eyes" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjQwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxlbGxpcHNlIGN4PSIyMCIgY3k9IjIwIiByeD0iMTIiIHJ5PSI4IiBmaWxsPSIjMDA2NmZmIi8+PGVsbGlwc2UgY3g9IjgwIiBjeT0iMjAiIHJ4PSIxMiIgcnk9IjgiIGZpbGw9IiMwMDY2ZmYiLz48L3N2Zz4=">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjQwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxlbGxpcHNlIGN4PSIyMCIgY3k9IjIwIiByeD0iMTIiIHJ5PSI4IiBmaWxsPSIjMDA2NmZmIi8+PGVsbGlwc2UgY3g9IjgwIiBjeT0iMjAiIHJ4PSIxMiIgcnk9IjgiIGZpbGw9IiMwMDY2ZmYiLz48L3N2Zz4=" alt="Eyes 2">
+                            </div>
+                            
+                            <!-- 髪型パーツ (非表示) -->
+                            <div class="part-item draggable hidden" data-type="part" data-category="hair" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjUsMTAwIEM1MCwyMCAxNTAsMjAgMTc1LDEwMCBDMTUwLDUwIDUwLDUwIDI1LDEwMCBaIiBmaWxsPSIjMzMzIi8+PC9zdmc+">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjUsMTAwIEM1MCwyMCAxNTAsMjAgMTc1LDEwMCBDMTUwLDUwIDUwLDUwIDI1LDEwMCBaIiBmaWxsPSIjMzMzIi8+PC9zdmc+" alt="Hair 1">
+                            </div>
+                            <div class="part-item draggable hidden" data-type="part" data-category="hair" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjAsMTAwIEM1MCwzMCAxNTAsMzAgMTgwLDEwMCBDMTMwLDUwIDcwLDUwIDIwLDEwMCBaIiBmaWxsPSIjYTUyYTJhIi8+PC9zdmc+">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjAsMTAwIEM1MCwzMCAxNTAsMzAgMTgwLDEwMCBDMTMwLDUwIDcwLDUwIDIwLDEwMCBaIiBmaWxsPSIjYTUyYTJhIi8+PC9zdmc+" alt="Hair 2">
+                            </div>
+                            
+                            <!-- 口パーツ (非表示) -->
+                            <div class="part-item draggable hidden" data-type="part" data-category="mouth" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTUsMTAgQzUsNSAzNSw1IDM1LDEwIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPjwvc3ZnPg==">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTUsMTAgQzUsNSAzNSw1IDM1LDEwIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPjwvc3ZnPg==" alt="Mouth 1">
+                            </div>
+                            <div class="part-item draggable hidden" data-type="part" data-category="mouth" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTUsMTAgQzE1LDE1IDI1LDE1IDM1LDEwIiBzdHJva2U9IiNlNDU3OGIiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPjwvc3ZnPg==">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTUsMTAgQzE1LDE1IDI1LDE1IDM1LDEwIiBzdHJva2U9IiNlNDU3OGIiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPjwvc3ZnPg==" alt="Mouth 2">
+                            </div>
+                            
+                            <!-- アクセサリーパーツ (非表示) -->
+                            <div class="part-item draggable hidden" data-type="part" data-category="accessory" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMjAiIGZpbGw9IiNmZmQ3MDAiLz48L3N2Zz4=">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMjAiIGZpbGw9IiNmZmQ3MDAiLz48L3N2Zz4=" alt="Accessory 1">
+                            </div>
+                            <div class="part-item draggable hidden" data-type="part" data-category="accessory" data-value="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iMzAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3QgeD0iMTAiIHk9IjEwIiB3aWR0aD0iNDAiIGhlaWdodD0iMTAiIGZpbGw9IiMwMDAiLz48L3N2Zz4=">
+                                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iMzAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3QgeD0iMTAiIHk9IjEwIiB3aWR0aD0iNDAiIGhlaWdodD0iMTAiIGZpbGw9IiMwMDAiLz48L3N2Zz4=" alt="Accessory 2">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 画像検索タブ -->
+                    <div class="part-content hidden" id="image-search-content">
+                        <div class="mb-4">
+                            <label for="searchTerm" class="block mb-2 font-medium">画像を検索</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="searchTerm" placeholder="例: 猫の目、帽子、髪型..." 
+                                       class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-base">
+                                <button id="searchBtn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                                    検索
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="flex items-center mb-2">
+                                <span id="searchStatus" class="text-sm text-gray-500">検索するとここに画像が表示されます</span>
+                                <div id="searchSpinner" class="ml-2 hidden">
+                                    <svg class="animate-spin h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div id="searchResults" class="grid grid-cols-2 gap-2">
+                                <!-- 検索結果がここに表示されます -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- アップロードタブ -->
+                    <div class="part-content hidden" id="upload-content">
+                        <div class="mb-4">
+                            <label class="block mb-2 font-medium">カスタムパーツをアップロード</label>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">透過PNG画像を推奨</p>
+                            <input type="file" id="customPartUpload" accept="image/*" 
+                                   class="block w-full text-base border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white hover:file:bg-primary/90 transition-colors">
+                        </div>
+                        <div class="grid grid-cols-3 sm:grid-cols-4 gap-2" id="customPartsPreview">
+                            <!-- カスタムパーツのプレビュー -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ヘルプと説明 -->
+        <div class="mt-8 bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+            <h2 class="text-xl font-semibold mb-2">使い方</h2>
+            <ol class="list-decimal list-inside space-y-2 pl-4">
+                <li>「ベース」タブでキャラクターの基本形を選びます</li>
+                <li>「パーツ」タブから目・髪型などのパーツを選んでクリックすると、キャンバスに追加されます</li>
+                <li>「画像検索」タブでは欲しいパーツを検索できます（AIが生成した画像から選べます）</li>
+                <li>「アップロード」タブでは自分の画像をパーツとして使えます</li>
+                <li><strong>パーツの調整方法:</strong>
+                    <ul class="list-disc list-inside ml-4 space-y-1">
+                        <li>ドラッグ：パーツを移動</li>
+                        <li>右下の丸：サイズ変更</li>
+                        <li>右上の丸：回転</li>
+                        <li>左上の赤い丸：削除</li>
+                    </ul>
+                </li>
+                <li>完成したら「スクリーンショット」ボタンでキャプチャできます</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // ダークモード検出
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // 変数初期化
+        let customParts = [];
+        let activePartId = 0;
+        let currentTab = 'base';
+        let currentCategory = 'eyes';
+        
+        // DOM要素の取得
+        const partTabs = document.querySelectorAll('.part-tab');
+        const partContents = document.querySelectorAll('.part-content');
+        const categoryBtns = document.querySelectorAll('.parts-category-btn');
+        const characterCanvas = document.getElementById('character-canvas');
+        const baseLayer = document.getElementById('baseLayer');
+        const partsGrid = document.getElementById('parts-grid');
+        const customPartUpload = document.getElementById('customPartUpload');
+        const customPartsPreview = document.getElementById('customPartsPreview');
+        const searchTermInput = document.getElementById('searchTerm');
+        const searchBtn = document.getElementById('searchBtn');
+        const searchResults = document.getElementById('searchResults');
+        const searchStatus = document.getElementById('searchStatus');
+        const searchSpinner = document.getElementById('searchSpinner');
+        const resetBtn = document.getElementById('resetBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        // ベース画像の初期設定
+        baseLayer.style.backgroundImage = `url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZWxsaXBzZSBjeD0iMTUwIiBjeT0iMTUwIiByeD0iODAiIHJ5PSI5MCIgZmlsbD0iI2ZmZDhiNSIvPjxwYXRoIGQ9Ik05MCwyMDAgQzEwMCwxODAgMTUwLDE3MCAxNTAsMTcwIEMxNTAsMTcwIDIwMCwxODAgMjEwLDIwMCBMMjEwLDM1MCBDOTAsMzUwIDkwLDIwMCA5MCwyMDAgWiIgZmlsbD0iI2VlZWVlZSIvPjwvc3ZnPg==')`;
+        
+        // タブ切り替え処理
+        partTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                // アクティブタブの切り替え
+                partTabs.forEach(t => {
+                    if (t.dataset.tab === tabName) {
+                        t.classList.remove('bg-gray-300', 'dark:bg-gray-700');
+                        t.classList.add('bg-primary', 'text-white');
+                    } else {
+                        t.classList.remove('bg-primary', 'text-white');
+                        t.classList.add('bg-gray-300', 'dark:bg-gray-700');
+                    }
+                });
+                
+                // コンテンツ切り替え
+                partContents.forEach(content => {
+                    if (content.id === `${tabName}-content`) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                });
+                
+                currentTab = tabName;
+            });
+        });
+        
+        // カテゴリ切り替え処理
+        categoryBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const category = btn.dataset.category;
+                
+                // アクティブカテゴリの切り替え
+                categoryBtns.forEach(b => {
+                    if (b.dataset.category === category) {
+                        b.classList.remove('bg-gray-300', 'dark:bg-gray-700');
+                        b.classList.add('bg-primary', 'text-white');
+                    } else {
+                        b.classList.remove('bg-primary', 'text-white');
+                        b.classList.add('bg-gray-300', 'dark:bg-gray-700');
+                    }
+                });
+                
+                // カテゴリに応じたパーツ表示
+                document.querySelectorAll('.part-item[data-category]').forEach(item => {
+                    if (item.dataset.category === category) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                });
+                
+                currentCategory = category;
+            });
+        });
+        
+        // ベースパーツ選択処理
+        document.querySelectorAll('.part-item[data-type="base"]').forEach(item => {
+            item.addEventListener('click', () => {
+                // 同じタイプのパーツの選択状態をリセット
+                document.querySelectorAll('.part-item[data-type="base"]').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                
+                // クリックされたパーツを選択状態に
+                item.classList.add('selected');
+                
+                // ベースレイヤーに適用
+                baseLayer.style.backgroundImage = `url('${item.dataset.value}')`;
+            });
+        });
+        
+        // パーツをキャンバスに追加
+        document.querySelectorAll('.part-item.draggable').forEach(item => {
+            item.addEventListener('click', () => {
+                addPartToCanvas(item.dataset.value, item.dataset.category);
+            });
+        });
+        
+        // カスタムパーツのアップロード処理
+        customPartUpload.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        // カスタムパーツ配列に追加
+                        customParts.push(event.target.result);
+                        updateCustomPartsPreview();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        });
+        
+        // カスタムパーツのプレビュー更新
+        function updateCustomPartsPreview() {
+            customPartsPreview.innerHTML = '';
+            
+            customParts.forEach((src, index) => {
+                const partItem = document.createElement('div');
+                partItem.className = 'part-item';
+                
+                const img = document.createElement('img');
+                img.src = src;
+                img.className = 'w-full h-full object-contain';
+                img.alt = `Custom Part ${index + 1}`;
+                partItem.appendChild(img);
+                
+                // クリックイベントを追加
+                partItem.addEventListener('click', () => {
+                    addPartToCanvas(src, 'custom');
+                });
+                
+                customPartsPreview.appendChild(partItem);
+            });
+        }
+        
+        // パーツをキャンバスに追加する関数
+        function addPartToCanvas(src, category) {
+            // 新しいパーツID
+            const partId = activePartId++;
+            
+            // パーツコンテナ作成
+            const partContainer = document.createElement('div');
+            partContainer.id = `part-${partId}`;
+            partContainer.className = 'draggable-part';
+            partContainer.style.width = '100px';
+            partContainer.style.height = '100px';
+            partContainer.dataset.part = partId;
+            
+            // パーツの初期位置を設定 (種類によって異なる)
+            const initialPosition = getInitialPositionForCategory(category);
+            partContainer.style.left = initialPosition.x + 'px';
+            partContainer.style.top = initialPosition.y + 'px';
+            
+            // パーツ画像を追加
+            const partImg = document.createElement('img');
+            partImg.src = src;
+            partImg.className = 'w-full h-full object-contain';
+            partImg.alt = `Part ${partId}`;
+            partContainer.appendChild(partImg);
+            
+            // 回転・リサイズ・削除用のハンドル
+            const resizeHandle = document.createElement('div');
+            resizeHandle.className = 'control-handle resize-handle';
+            partContainer.appendChild(resizeHandle);
+            
+            const rotateHandle = document.createElement('div');
+            rotateHandle.className = 'control-handle rotate-handle';
+            partContainer.appendChild(rotateHandle);
+            
+            const removeHandle = document.createElement('div');
+            removeHandle.className = 'control-handle remove-handle';
+            removeHandle.addEventListener('click', () => {
+                partContainer.remove();
+            });
+            partContainer.appendChild(removeHandle);
+            
+            // キャンバスに追加
+            characterCanvas.appendChild(partContainer);
+            
+            // ドラッグ機能を設定
+            setupDraggable(partContainer);
+        }
+        
+        // パーツ種類に応じた初期位置を取得
+        function getInitialPositionForCategory(category) {
+            switch(category) {
+                case 'eyes':
+                    return { x: 100, y: 120 };
+                case 'hair':
+                    return { x: 75, y: 80 };
+                case 'mouth':
+                    return { x: 130, y: 180 };
+                case 'accessory':
+                    return { x: 120, y: 60 };
+                default:
+                    return { x: 100, y: 100 };
+            }
+        }
+        
+        // interact.jsでドラッグ機能を設定
+        function setupDraggable(element) {
+            // ドラッグ
+            interact(element)
+                .draggable({
+                    inertia: true,
+                    modifiers: [
+                        interact.modifiers.restrictRect({
+                            restriction: 'parent',
+                            endOnly: true
+                        })
+                    ],
+                    listeners: {
+                        move(event) {
+                            const target = event.target;
+                            
+                            // 現在の位置を取得
+                            const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                            const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+                            
+                            // パーツを移動
+                            target.style.transform = `translate(${x}px, ${y}px) rotate(${target.getAttribute('data-angle') || 0}deg)`;
+                            
+                            // 位置データを更新
+                            target.setAttribute('data-x', x);
+                            target.setAttribute('data-y', y);
+                        }
+                    }
+                });
+            
+            // リサイズ
+            interact(element.querySelector('.resize-handle'))
+                .draggable({
+                    listeners: {
+                        move(event) {
+                            const target = event.target.parentNode;
+                            
+                            // 現在のサイズを取得
+                            const width = parseFloat(target.style.width) || 100;
+                            const height = parseFloat(target.style.height) || 100;
+                            
+                            // 新しいサイズを計算
+                            const newWidth = Math.max(30, width + event.dx);
+                            const newHeight = Math.max(30, height + event.dy);
+                            
+                            // サイズを更新
+                            target.style.width = newWidth + 'px';
+                            target.style.height = newHeight + 'px';
+                        }
+                    }
+                });
+            
+            // 回転
+            interact(element.querySelector('.rotate-handle'))
+                .draggable({
+                    listeners: {
+                        move(event) {
+                            const target = event.target.parentNode;
+                            
+                            // パーツの中心座標を取得
+                            const rect = target.getBoundingClientRect();
+                            const centerX = rect.left + rect.width / 2;
+                            const centerY = rect.top + rect.height / 2;
+                            
+                            // マウス/タッチの座標を取得
+                            const x = event.clientX - centerX;
+                            const y = event.clientY - centerY;
+                            
+                            // 角度を計算 (ラジアンから度に変換)
+                            const angle = Math.atan2(y, x) * 180 / Math.PI + 90;
+                            
+                            // 現在の移動量を取得
+                            const translateX = parseFloat(target.getAttribute('data-x')) || 0;
+                            const translateY = parseFloat(target.getAttribute('data-y')) || 0;
+                            
+                            // 変形を適用
+                            target.style.transform = `translate(${translateX}px, ${translateY}px) rotate(${angle}deg)`;
+                            
+                            // 角度を保存
+                            target.setAttribute('data-angle', angle);
+                        }
+                    }
+                });
+        }
+        
+        // 画像検索処理
+        searchBtn.addEventListener('click', async () => {
+            const searchTerm = searchTermInput.value.trim();
+            if (!searchTerm) return;
+            
+            // UIを検索中状態に
+            searchStatus.textContent = '検索中...';
+            searchSpinner.classList.remove('hidden');
+            searchResults.innerHTML = '';
+            
+            try {
+                // Poe APIを使用して画像を生成
+                if (window.Poe) {
+                    // ハンドラ登録
+                    window.Poe.registerHandler("image-search-handler", (result, context) => {
+                        const msg = result.responses[0];
+                        
+                        if (msg.status === "error") {
+                            searchStatus.textContent = "エラー: " + msg.statusText;
+                            searchSpinner.classList.add('hidden');
+                        } else if (msg.status === "complete") {
+                            searchSpinner.classList.add('hidden');
+                            
+                            // 添付ファイルがある場合
+                            if (msg.attachments?.length > 0) {
+                                searchStatus.textContent = `「${searchTerm}」の検索結果:`;
+                                
+                                // 画像結果を表示
+                                msg.attachments.forEach(attachment => {
+                                    const resultItem = document.createElement('div');
+                                    resultItem.className = 'border rounded-lg overflow-hidden';
+                                    
+                                    const img = document.createElement('img');
+                                    img.src = attachment.url;
+                                    img.className = 'w-full h-32 object-contain';
+                                    img.alt = searchTerm;
+                                    
+                                    const addBtn = document.createElement('button');
+                                    addBtn.className = 'w-full py-1 bg-primary text-white text-sm';
+                                    addBtn.textContent = '追加';
+                                    
+                                    // 画像をキャンバスに追加するイベント
+                                    addBtn.addEventListener('click', () => {
+                                        addPartToCanvas(attachment.url, 'custom');
+                                    });
+                                    
+                                    resultItem.appendChild(img);
+                                    resultItem.appendChild(addBtn);
+                                    searchResults.appendChild(resultItem);
+                                });
+                            } else {
+                                searchStatus.textContent = "画像が見つかりませんでした。別のキーワードを試してください。";
+                            }
+                        }
+                    });
+                    
+                    // 画像検索リクエスト
+                    await window.Poe.sendUserMessage(
+                        `@FLUX-pro-1.1 ${searchTerm}`,
+                        {
+                            handler: "image-search-handler",
+                            stream: false,
+                            openChat: false
+                        }
+                    );
+                } else {
+                    // Poe APIが使えない場合（デモ用にダミー画像を表示）
+                    searchStatus.textContent = `「${searchTerm}」の検索結果 (デモ):`;
+                    searchSpinner.classList.add('hidden');
+                    
+                    // ダミー画像を表示
+                    const demoUrls = [
+                        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI2ZmYWEwMCIvPjwvc3ZnPg==',
+                        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgZmlsbD0iIzAwYWFmZiIvPjwvc3ZnPg=='
+                    ];
+                    
+                    demoUrls.forEach(url => {
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'border rounded-lg overflow-hidden';
+                        
+                        const img = document.createElement('img');
+                        img.src = url;
+                        img.className = 'w-full h-32 object-contain';
+                        img.alt = searchTerm;
+                        
+                        const addBtn = document.createElement('button');
+                        addBtn.className = 'w-full py-1 bg-primary text-white text-sm';
+                        addBtn.textContent = '追加';
+                        
+                        // 画像をキャンバスに追加するイベント
+                        addBtn.addEventListener('click', () => {
+                            addPartToCanvas(url, 'custom');
+                        });
+                        
+                        resultItem.appendChild(img);
+                        resultItem.appendChild(addBtn);
+                        searchResults.appendChild(resultItem);
+                    });
+                }
+            } catch (err) {
+                searchStatus.textContent = `エラー: ${err.message || '検索に失敗しました'}`;
+                searchSpinner.classList.add('hidden');
+                console.error('Search error:', err);
+            }
+        });
+        
+        // リセットボタン
+        resetBtn.addEventListener('click', () => {
+            // パーツをすべて削除
+            document.querySelectorAll('.draggable-part').forEach(part => {
+                part.remove();
+            });
+            
+            // ベースレイヤーをデフォルトに戻す
+            baseLayer.style.backgroundImage = `url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZWxsaXBzZSBjeD0iMTUwIiBjeT0iMTUwIiByeD0iODAiIHJ5PSI5MCIgZmlsbD0iI2ZmZDhiNSIvPjxwYXRoIGQ9Ik05MCwyMDAgQzEwMCwxODAgMTUwLDE3MCAxNTAsMTcwIEMxNTAsMTcwIDIwMCwxODAgMjEwLDIwMCBMMjEwLDM1MCBDOTAsMzUwIDkwLDIwMCA5MCwyMDAgWiIgZmlsbD0iI2VlZWVlZSIvPjwvc3ZnPg==')`;
+            
+            // ベースのデフォルト選択
+            document.querySelectorAll('.part-item[data-type="base"]').forEach((item, index) => {
+                item.classList.toggle('selected', index === 0);
+            });
+        });
+        
+        // キャラクターのスクリーンショットを作成
+        downloadBtn.addEventListener('click', () => {
+            // 注意書き
+            alert('キャラクター画像が表示されます。右クリックまたは長押しして保存してください。');
+            
+            // html2canvasを使わず、キャンバスを直接作成
+            const canvas = document.createElement('canvas');
+            canvas.width = 300;
+            canvas.height = 400;
+            const ctx = canvas.getContext('2d');
+            
+            // 背景色
+            ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#2d3748' : '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // ベースレイヤーと各パーツを描画
+            const drawElements = async () => {
+                // ベースを描画
+                const baseUrl = baseLayer.style.backgroundImage.replace(/url\(['"](.+)['"]\)/, '$1');
+                
+                await new Promise((resolve) => {
+                    const baseImg = new Image();
+                    baseImg.onload = () => {
+                        ctx.drawImage(baseImg, 0, 0, canvas.width, canvas.height);
+                        resolve();
+                    };
+                    baseImg.src = baseUrl;
+                });
+                
+                // 各パーツを描画
+                const parts = document.querySelectorAll('.draggable-part');
+                
+                for (const part of parts) {
+                    await new Promise((resolve) => {
+                        // パーツの情報を取得
+                        const rect = part.getBoundingClientRect();
+                        const canvasRect = characterCanvas.getBoundingClientRect();
+                        
+                        // パーツの相対位置を計算
+                        const x = rect.left - canvasRect.left;
+                        const y = rect.top - canvasRect.top;
+                        
+                        // パーツのサイズ
+                        const width = rect.width;
+                        const height = rect.height;
+                        
+                        // 回転角度
+                        const angle = parseFloat(part.getAttribute('data-angle') || 0);
+                        
+                        // 画像を取得
+                        const img = part.querySelector('img');
+                        const partImg = new Image();
+                        partImg.onload = () => {
+                            // キャンバスの状態を保存
+                            ctx.save();
+                            
+                            // 回転の中心点を設定
+                            ctx.translate(x + width/2, y + height/2);
+                            ctx.rotate(angle * Math.PI / 180);
+                            
+                            // 画像を描画
+                            ctx.drawImage(partImg, -width/2, -height/2, width, height);
+                            
+                            // キャンバスの状態を復元
+                            ctx.restore();
+                            
+                            resolve();
+                        };
+                        partImg.src = img.src;
+                    });
+                }
+                
+                // 新しいウィンドウに表示
+                const dataUrl = canvas.toDataURL('image/png');
+                const win = window.open();
+                win.document.write(`<img src="${dataUrl}" alt="Character" style="max-width:100%;">`);
+            };
+            
+            drawElements();
+        });
+    </script>
+</body>
+</html>
