@@ -550,111 +550,39 @@
                 });
         }
         
-        // 画像検索処理
-        searchBtn.addEventListener('click', async () => {
-            const searchTerm = searchTermInput.value.trim();
-            if (!searchTerm) return;
-            
-            // UIを検索中状態に
-            searchStatus.textContent = '検索中...';
-            searchSpinner.classList.remove('hidden');
-            searchResults.innerHTML = '';
-            
-            try {
-                // Poe APIを使用して画像を生成
-                if (window.Poe) {
-                    // ハンドラ登録
-                    window.Poe.registerHandler("image-search-handler", (result, context) => {
-                        const msg = result.responses[0];
-                        
-                        if (msg.status === "error") {
-                            searchStatus.textContent = "エラー: " + msg.statusText;
-                            searchSpinner.classList.add('hidden');
-                        } else if (msg.status === "complete") {
-                            searchSpinner.classList.add('hidden');
-                            
-                            // 添付ファイルがある場合
-                            if (msg.attachments?.length > 0) {
-                                searchStatus.textContent = `「${searchTerm}」の検索結果:`;
-                                
-                                // 画像結果を表示
-                                msg.attachments.forEach(attachment => {
-                                    const resultItem = document.createElement('div');
-                                    resultItem.className = 'border rounded-lg overflow-hidden';
-                                    
-                                    const img = document.createElement('img');
-                                    img.src = attachment.url;
-                                    img.className = 'w-full h-32 object-contain';
-                                    img.alt = searchTerm;
-                                    
-                                    const addBtn = document.createElement('button');
-                                    addBtn.className = 'w-full py-1 bg-primary text-white text-sm';
-                                    addBtn.textContent = '追加';
-                                    
-                                    // 画像をキャンバスに追加するイベント
-                                    addBtn.addEventListener('click', () => {
-                                        addPartToCanvas(attachment.url, 'custom');
-                                    });
-                                    
-                                    resultItem.appendChild(img);
-                                    resultItem.appendChild(addBtn);
-                                    searchResults.appendChild(resultItem);
-                                });
-                            } else {
-                                searchStatus.textContent = "画像が見つかりませんでした。別のキーワードを試してください。";
-                            }
-                        }
-                    });
-                    
-                    // 画像検索リクエスト
-                    await window.Poe.sendUserMessage(
-                        `@FLUX-pro-1.1 ${searchTerm}`,
-                        {
-                            handler: "image-search-handler",
-                            stream: false,
-                            openChat: false
-                        }
-                    );
-                } else {
-                    // Poe APIが使えない場合（デモ用にダミー画像を表示）
-                    searchStatus.textContent = `「${searchTerm}」の検索結果 (デモ):`;
-                    searchSpinner.classList.add('hidden');
-                    
-                    // ダミー画像を表示
-                    const demoUrls = [
-                        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI2ZmYWEwMCIvPjwvc3ZnPg==',
-                        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgZmlsbD0iIzAwYWFmZiIvPjwvc3ZnPg=='
-                    ];
-                    
-                    demoUrls.forEach(url => {
-                        const resultItem = document.createElement('div');
-                        resultItem.className = 'border rounded-lg overflow-hidden';
-                        
-                        const img = document.createElement('img');
-                        img.src = url;
-                        img.className = 'w-full h-32 object-contain';
-                        img.alt = searchTerm;
-                        
-                        const addBtn = document.createElement('button');
-                        addBtn.className = 'w-full py-1 bg-primary text-white text-sm';
-                        addBtn.textContent = '追加';
-                        
-                        // 画像をキャンバスに追加するイベント
-                        addBtn.addEventListener('click', () => {
-                            addPartToCanvas(url, 'custom');
-                        });
-                        
-                        resultItem.appendChild(img);
-                        resultItem.appendChild(addBtn);
-                        searchResults.appendChild(resultItem);
-                    });
-                }
-            } catch (err) {
-                searchStatus.textContent = `エラー: ${err.message || '検索に失敗しました'}`;
-                searchSpinner.classList.add('hidden');
-                console.error('Search error:', err);
-            }
-        });
+        // 画像検索処理 - Pixabayリンク方式
+searchBtn.addEventListener('click', () => {
+    const searchTerm = searchTermInput.value.trim();
+    if (!searchTerm) return;
+    
+    // 検索ステータスの更新
+    searchStatus.textContent = '別タブでPixabayの画像検索を開きました。好きな画像を右クリックで保存し、「アップロード」タブからアップロードしてください。';
+    searchSpinner.classList.add('hidden');
+    
+    // 画像検索結果を表示するエリアをクリア
+    searchResults.innerHTML = '';
+    
+    // 説明テキストの追加
+    const helpText = document.createElement('p');
+    helpText.className = 'text-sm text-gray-600 dark:text-gray-400 mt-2 mb-4';
+    helpText.innerHTML = `
+        <ol class="list-decimal list-inside space-y-1">
+            <li>開いたPixabayページから好きな画像を選びます</li>
+            <li>画像を右クリック→「名前を付けて画像を保存」で保存</li>
+            <li>「アップロード」タブから保存した画像をアップロード</li>
+        </ol>
+    `;
+    searchResults.appendChild(helpText);
+    
+    // 「検索ページを開く」ボタンを作成
+    const openBtn = document.createElement('button');
+    openBtn.className = 'w-full py-2 bg-primary text-white rounded-lg mt-2';
+    openBtn.textContent = 'Pixabayで検索ページを開く';
+    openBtn.addEventListener('click', () => {
+        window.open(`https://pixabay.com/images/search/${encodeURIComponent(searchTerm)}/?orientation=horizontal`, '_blank');
+    });
+    searchResults.appendChild(openBtn);
+});
         
         // リセットボタン
         resetBtn.addEventListener('click', () => {
